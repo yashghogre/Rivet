@@ -9,9 +9,26 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "keyring>=25.7.0",
+    "langgraph>=1.0.4",
+    "langsmith>=0.4.49",
     "rich>=14.2.0",
     "typer>=0.20.0",
 ]
 
 [project.scripts]
 rivet = "rivet.main:app"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.0",
+    "ruff>=0.14.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

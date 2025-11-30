@@ -1,6 +1,7 @@
-from rich.panel import Panel
 from rich.layout import Layout
+from rich.panel import Panel
 from rich.syntax import Syntax
+
 
 def update_on_event(layout: Layout, event: dict):
     if "node_ingest" in event:
@@ -15,4 +16,9 @@ def update_on_event(layout: Layout, event: dict):
 
     elif "node_fix" in event:
         error_msg = event["node_fix"].get("error")
-        layout["footer"].update(Panel(f"[red]❌ Test Failed:[/red] {error_msg}\n[green]🔧 Applying Fix...[/green]", title="Self-Healing Active"))
+        layout["footer"].update(
+            Panel(
+                f"[red]❌ Test Failed:[/red] {error_msg}\n[green]🔧 Applying Fix...[/green]",
+                title="Self-Healing Active",
+            )
+        )

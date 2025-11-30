@@ -10,4 +10,7 @@
   ███    ███ █▀    ▀██████▀    ██████████    ▄████▀  
   ███    ███                                         
   </pre>
+  <pre>
+Generate production-ready API clients from documentation in minutes, not days.
+  </pre>
 </div>

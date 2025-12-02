@@ -1,45 +1,113 @@
+import json
 import os
+import stat
+from pathlib import Path
+from typing import Tuple
 
-import keyring
 from rich.console import Console
 from rich.prompt import Prompt
 
 SERVICE_NAME = "rivet-tool"
-USERNAME = "api_key"
+USERNAME_LLM_API_KEY = "llm_api_key"
+USERNAME_LLM_BASE_URL = "llm_api_url"
+USERNAME_LLM_NAME = "llm_name"
+CREDENTIALS_FILE = Path.home() / ".config" / "rivet" / "credentials.json"
 
 console = Console()
 
 
-def get_api_key() -> str:
-    env_key = os.getenv("RIVET_API_KEY")
-    if env_key:
-        return env_key
-
+def _save_to_file_fallback(key: str, value: str):
     try:
-        stored_key = keyring.get_password(SERVICE_NAME, USERNAME)
-        if stored_key:
-            return stored_key
+        CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        data = {}
 
-    except Exception:
-        pass
+        if CREDENTIALS_FILE.exists():
+            try:
+                with open(CREDENTIALS_FILE, "r") as f:
+                    data = json.load(f)
+                    if not isinstance(data, dict):
+                        data = {}
+            except Exception:
+                data = {}
 
-    console.print("[yellow]⚠️ API Key not found![/yellow]")
-    new_key = Prompt.ask("🔑 Please paste your API Key", password=True)
+        data[key] = value
 
+        with open(CREDENTIALS_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        os.chmod(CREDENTIALS_FILE, stat.S_IREAD | stat.S_IWRITE)
+
+    except Exception as e:
+        console.print(f"[red]❌ Could not save to fallback file: {e}[/red]")
+
+
+def _load_from_file_fallback(entity: str) -> str | None:
+    if not CREDENTIALS_FILE.exists():
+        return None
     try:
-        keyring.set_password(SERVICE_NAME, USERNAME, new_key)
-        console.print("[green]✅ Key saved securely to OS Keyring[/green]")
-
+        with open(CREDENTIALS_FILE, "r") as f:
+            data = json.load(f)
+            return data.get(entity)
     except Exception:
-        console.print("[red]Could not save to Keyring. Please paste the key next time![/red]")
+        return None
 
+
+def set_llm_api_key() -> str:
+    new_key = Prompt.ask("🔑 Please paste your LLM API Key", password=True)
+    _save_to_file_fallback(USERNAME_LLM_API_KEY, new_key)
+    console.print(f"[green]✅ Key saved securely to {CREDENTIALS_FILE}[/green]")
     return new_key
 
 
+def get_llm_api_key() -> str:
+    file_key = _load_from_file_fallback("llm_api_key")
+    if file_key:
+        return file_key
+    new_key = set_llm_api_key()
+    return new_key
+
+
+def set_llm_api_url() -> str:
+    new_key = Prompt.ask("🔗 Please paste your LLM API URL")
+    _save_to_file_fallback(USERNAME_LLM_BASE_URL, new_key)
+    console.print(f"[green]✅ Key saved securely to {CREDENTIALS_FILE}[/green]")
+    return new_key
+
+
+def get_llm_api_url() -> str:
+    file_key = _load_from_file_fallback("llm_api_url")
+    if file_key:
+        return file_key
+    new_key = set_llm_api_url()
+    return new_key
+
+
+def set_llm_name() -> str:
+    llm_name = Prompt.ask("🤖 Please enter your LLM Model Name")
+    _save_to_file_fallback(USERNAME_LLM_NAME, llm_name)
+    console.print(f"[green]✅ LLM Model Name saved securely to {CREDENTIALS_FILE}[/green]")
+    return llm_name
+
+
+def get_llm_name() -> str:
+    file_key = _load_from_file_fallback("llm_name")
+    if file_key:
+        return file_key
+    llm_name = set_llm_name()
+    return llm_name
+
+
+def get_llm_credentials() -> Tuple[str, str, str]:
+    llm_api_url = get_llm_api_url()
+    llm_api_key = get_llm_api_key()
+    llm_name = get_llm_name()
+    return (llm_api_url, llm_api_key, llm_name)
+
+
+"""
 def reset_api_key():
     try:
-        keyring.delete_password(SERVICE_NAME, USERNAME)
         console.print("[green]🗑️ API key removed from secured storage.[/green]")
 
-    except keyring.errors.PasswordDeleteError:
+    except Exception:
         console.print("[yellow]⚠️ No Key was stored!")
+"""

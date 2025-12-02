@@ -1,3 +1,5 @@
+import asyncio
+
 import typer
 from rich.console import Console
 from rich.live import Live
@@ -6,7 +8,7 @@ from rich.prompt import Prompt
 from rivet.cli.render import update_on_event
 from rivet.cli.ui import create_layout
 from rivet.core.agent import build_graph
-from rivet.utils.config import get_api_key, reset_api_key
+from rivet.tools.url_processor import check_url_validity
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -20,11 +22,18 @@ def generate(
     ),
     output: str = typer.Option("./output", help="Save directory"),
 ):
-    api_key = get_api_key()
+    asyncio.run(async_generate(url, requirement, output))
+
+
+async def async_generate(url: str, requirement: str, output: str):
+    # llm_api_key, llm_base_url, llm_name = get_llm_credentials()
 
     if not url:
         console.print("Welcome to Rivet!", style="bold blue")
-        url = Prompt.ask("Paste the [bold blue]API Docs URL[/bold blue]")
+        url = Prompt.ask("Paste the [bold blue]API Swagger/OpenAPI/Docs URL[/bold blue]")
+        if not check_url_validity(url):
+            console.print("[red]Please input a valid URL![/red]")
+            return
 
     if not requirement:
         if (
@@ -41,22 +50,28 @@ def generate(
 
     layout = create_layout()
     graph = build_graph()
+
+    """NOTE: Uncomment this when the actual graph is setup, so ruff does not remove it XD
+    run_config = {
+        "configurable": {
+            "llm_api_key": llm_api_key,
+            "llm_base_url": llm_base_url,
+            "llm_name": llm_name,
+            "user_id": "local_user",
+        },
+    }
+    """
+
     initial_state = {
         "url": url,
         "requirement": requirement,
-        "api_key": api_key,
     }
 
     with Live(layout, refresh_per_second=4, console=console):
-        for event in graph.stream(initial_state):
+        async for event in graph.astream(initial_state):
             update_on_event(layout, event)
 
     console.print(f"[bold green]Done! SDK saved to: {output}[/bold green]")
-
-
-@app.command()
-def logout():
-    reset_api_key()
 
 
 if __name__ == "__main__":

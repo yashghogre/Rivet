@@ -10,4 +10,5 @@ wheels/
 .venv
 
 # Other files
+.env
 todo.md

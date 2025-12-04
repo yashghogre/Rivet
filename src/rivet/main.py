@@ -58,6 +58,7 @@ async def async_generate(url: str, requirement: str, output: str):
             "llm_base_url": llm_base_url,
             "llm_name": llm_name,
             "user_id": "local_user",
+            "output_dir": output,
         },
     }
     """

@@ -7,7 +7,12 @@ from rich.console import Console
 from rivet.core.inference import chat_completion
 from rivet.core.schema import AgentState, Message
 from rivet.tools.scrape import ingest_resource
-from rivet.utils.prompts import GENERATE_CODE_SYSTEM_PROMPT, GENERATE_CODE_USER_PROMPT
+from rivet.utils.prompts import (
+    GENERATE_CODE_SYSTEM_PROMPT,
+    GENERATE_CODE_USER_PROMPT,
+    GENERATE_TEST_SYSTEM_PROMPT,
+    GENERATE_TEST_USER_PROMPT,
+)
 
 console = Console()
 
@@ -95,23 +100,50 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
 
 async def generate_code(state: AgentState, configuration: RunnableConfig):
     config = configuration.get("configurable", {})
-    sys_msg = Message(
+    output_dir = config.get("output_dir", "./output")
+
+    sdk_sys_msg = Message(
         role="system",
         content=GENERATE_CODE_SYSTEM_PROMPT,
     )
-    usr_msg = Message(
+    sdk_usr_msg = Message(
         role="user",
         content=GENERATE_CODE_USER_PROMPT.format(
             SWAGGER_SPEC=json.dumps(state.spec_json),
             DOCS_TEXT=state.doc_text,
-            USER_REQUIREMENTS=state.requirement,
+            USER_REQUIREMENTS=state.requirement or "",
         ),
     )
-    final_msgs = [sys_msg, usr_msg]
+    final_sdk_msgs = [sdk_sys_msg, sdk_usr_msg]
+    generated_sdk_code = await chat_completion(config, final_sdk_msgs)
+    if generated_sdk_code is not None:
+        with open(f"{output_dir}/client.py", "w") as f:
+            f.write(generated_sdk_code)
+    else:
+        # NOTE: Instead of raising the error here, we should try generating code again.
+        raise ValueError("Failed to generate code.")
 
-    generated_code = await chat_completion(config, final_msgs)
+    test_sys_msg = Message(
+        role="system",
+        content=GENERATE_TEST_SYSTEM_PROMPT,
+    )
+    test_usr_msg = Message(
+        role="user",
+        content=GENERATE_TEST_USER_PROMPT.format(
+            SWAGGER_SPEC=json.dumps(state.spec_json),
+            GENERATED_CODE=generated_sdk_code,
+            USER_REQUIREMENTS=state.requirement or "",
+        ),
+    )
+    final_test_msgs = [test_sys_msg, test_usr_msg]
+    generated_test_code = await chat_completion(config, final_test_msgs)
+    if generated_test_code is not None:
+        with open(f"{output_dir}/test_client.py", "w") as f:
+            f.write(generated_test_code)
+    else:
+        # NOTE: Same as above.
+        raise ValueError("Failed to generate code.")
 
     return {
-        "generated_code": generated_code,
         "status": "generating",
     }

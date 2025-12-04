@@ -10,11 +10,10 @@ class Message(BaseModel):
 
 class AgentState(BaseModel):
     url: str
-    requirement: str
+    requirement: Optional[str] = None
     doc_text: str = ""
     spec_json: Dict = Field(default_factory=dict)
-    generated_code: str = ""
     status: Literal["idle", "ingested", "generating", "error"] = "idle"
     error: Optional[str] = None
-    # msgs_exchanged: Optional[List[Message]] = None    # NOTE: Commenting it out for now
-    # Will see if it is needed later
+    # msgs_exchanged: Optional[List[Message]] = None    # NOTE: Commenting it out for now, will see if it is needed later
+    # generated_code: str = ""                          # NOTE: This will also be looked afterwards

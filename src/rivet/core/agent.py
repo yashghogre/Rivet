@@ -1,10 +1,13 @@
 import asyncio
+import json
 
 from langchain_core.runnables import RunnableConfig
 from rich.console import Console
 
-from rivet.core.schema import AgentState
+from rivet.core.inference import chat_completion
+from rivet.core.schema import AgentState, Message
 from rivet.tools.scrape import ingest_resource
+from rivet.utils.prompts import GENERATE_CODE_SYSTEM_PROMPT, GENERATE_CODE_USER_PROMPT
 
 console = Console()
 
@@ -90,10 +93,25 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
         return {"error": str(e)}
 
 
-# async def generate_code(state: AgentState, configuration: RunnableConfig):
-# config = configuration.get("configurable", {})
-# llm_api_key = config.get("llm_api_key")
-# llm_base_url = config.get("llm_base_url")
-# llm_name = config.get("llm_name")
+async def generate_code(state: AgentState, configuration: RunnableConfig):
+    config = configuration.get("configurable", {})
+    sys_msg = Message(
+        role="system",
+        content=GENERATE_CODE_SYSTEM_PROMPT,
+    )
+    usr_msg = Message(
+        role="user",
+        content=GENERATE_CODE_USER_PROMPT.format(
+            SWAGGER_SPEC=json.dumps(state.spec_json),
+            DOCS_TEXT=state.doc_text,
+            USER_REQUIREMENTS=state.requirement,
+        ),
+    )
+    final_msgs = [sys_msg, usr_msg]
 
-# requirement = state.requirement
+    generated_code = await chat_completion(config, final_msgs)
+
+    return {
+        "generated_code": generated_code,
+        "status": "generating",
+    }

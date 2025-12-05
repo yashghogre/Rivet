@@ -26,6 +26,7 @@ The previous code generation failed to execute. You are now in FIX MODE.
     2.  **Data Models:** Pydantic `BaseModel` classes for schemas.
     3.  **Methods:** API endpoint methods with snake_case naming and full docstrings.
     4.  **Error Handling:** Custom exception classes.
+    5.  **Formatting:** Output raw Python code only. Do NOT wrap content in markdown code blocks (e.g., ```python). Do NOT include conversational text.
 
     ### SCOPE & FILTERING
     - **Critical:** Pay close attention to the `<user_requirements>` section in the prompt.
@@ -112,6 +113,7 @@ def get_test_sys_prompt():
         - **CRITICAL:** You must MOCK all network requests. Do not allow the tests to hit the real API.
         - Use `unittest.mock` or `pytest-mock` to patch the underlying HTTP client (e.g., `httpx.AsyncClient.request` or `requests.Session.request`) or the SDK methods themselves.
         - Verify that the SDK constructs the correct URLs and payloads based on the method arguments.
+    4.  **Formatting:** Output raw Python code only. Do NOT wrap content in markdown code blocks (e.g., ```python).
 
     **TECHNICAL CONSTRAINTS**
         - **Framework:** `pytest` and `pytest-asyncio` (if the SDK is async).

@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 import typer
 from rich.console import Console
@@ -9,6 +10,7 @@ from rivet.cli.render import update_on_event
 from rivet.cli.ui import create_layout
 from rivet.core.agent import build_graph
 from rivet.tools.url_processor import check_url_validity
+from rivet.utils.config import get_llm_credentials
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -22,11 +24,12 @@ def generate(
     ),
     output: str = typer.Option("./output", help="Save directory"),
 ):
+    os.makedirs(output, exist_ok=True)
     asyncio.run(async_generate(url, requirement, output))
 
 
 async def async_generate(url: str, requirement: str, output: str):
-    # llm_api_key, llm_base_url, llm_name = get_llm_credentials()
+    llm_base_url, llm_api_key, llm_name = get_llm_credentials()
 
     if not url:
         console.print("Welcome to Rivet!", style="bold blue")
@@ -51,7 +54,6 @@ async def async_generate(url: str, requirement: str, output: str):
     layout = create_layout()
     graph = build_graph()
 
-    """NOTE: Uncomment this when the actual graph is setup, so ruff does not remove it XD
     run_config = {
         "configurable": {
             "llm_api_key": llm_api_key,
@@ -61,7 +63,6 @@ async def async_generate(url: str, requirement: str, output: str):
             "output_dir": output,
         },
     }
-    """
 
     initial_state = {
         "url": url,
@@ -69,7 +70,7 @@ async def async_generate(url: str, requirement: str, output: str):
     }
 
     with Live(layout, refresh_per_second=4, console=console):
-        async for event in graph.astream(initial_state):
+        async for event in graph.astream(initial_state, config=run_config):
             update_on_event(layout, event)
 
     console.print(f"[bold green]Done! SDK saved to: {output}[/bold green]")

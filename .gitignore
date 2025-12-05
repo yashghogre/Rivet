@@ -12,3 +12,4 @@ wheels/
 # Other files
 .env
 todo.md
+output/

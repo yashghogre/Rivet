@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from litellm import acompletion
+from openai import AsyncOpenAI
 from rich.console import Console
 
 from rivet.core.schema import Message
@@ -20,10 +20,12 @@ async def chat_completion(config: Dict, msgs: List[Message]) -> str:
         raise ValueError("LLM Configuration not set.")
 
     try:
-        response = await acompletion(
-            model=llm_name,
+        client = AsyncOpenAI(
             base_url=llm_base_url,
             api_key=llm_api_key,
+        )
+        response = await client.chat.completions.create(
+            model=llm_name,
             messages=[msg.model_dump() for msg in msgs],
         )
         return response.choices[0].message.content

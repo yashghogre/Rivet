@@ -97,7 +97,7 @@ This is where the magic happens.
 
 ```
 # Clone the repository
-git clone [https://github.com/yashghogre/Rivet.git](https://github.com/yashghogre/Rivet.git)
+git clone https://github.com/yashghogre/Rivet.git
 
 # Install dependencies (We use uv!)
 uv sync
@@ -111,7 +111,7 @@ uv sync
 You can generate a full SDK or scope it to specific requirements.
 
 ```
-uv run rivet [https://petstore.swagger.io/v2/swagger.json](https://petstore.swagger.io/v2/swagger.json)
+uv run rivet https://petstore.swagger.io/v2/swagger.json
 ```
 
 

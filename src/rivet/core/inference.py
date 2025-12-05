@@ -8,7 +8,7 @@ from rivet.core.schema import Message
 console = Console()
 
 
-async def chat_completion(config: Dict, msgs: List[Message]):
+async def chat_completion(config: Dict, msgs: List[Message]) -> str:
     llm_api_key = config.get("llm_api_key")
     llm_base_url = config.get("llm_base_url")
     llm_name = config.get("llm_name")
@@ -19,11 +19,37 @@ async def chat_completion(config: Dict, msgs: List[Message]):
         )
         raise ValueError("LLM Configuration not set.")
 
-    response = await acompletion(
-        model=llm_name,
-        base_url=llm_base_url,
-        api_key=llm_api_key,
-        messages=[msg.model_dump() for msg in msgs],
-    )
+    try:
+        response = await acompletion(
+            model=llm_name,
+            base_url=llm_base_url,
+            api_key=llm_api_key,
+            messages=[msg.model_dump() for msg in msgs],
+        )
+        return response.choices[0].message.content
 
-    return response.choices[0].message.content
+    except Exception as e:
+        console.print(f"❌ Failed to create chat completion: {str(e)}")
+        raise
+
+
+async def direct_chat_completion(
+    config: Dict,
+    sys_msg_content: str,
+    usr_msg_content: str,
+) -> str:
+    try:
+        sys_msg = Message(
+            role="system",
+            content=sys_msg_content,
+        )
+        usr_msg = Message(
+            role="user",
+            content=usr_msg_content,
+        )
+        final_msgs = [sys_msg, usr_msg]
+        return await chat_completion(config, final_msgs)
+
+    except Exception as e:
+        console.print(f"❌ Failed to create chat completion: {str(e)}")
+        raise

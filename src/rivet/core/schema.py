@@ -13,7 +13,8 @@ class AgentState(BaseModel):
     requirement: Optional[str] = None
     doc_text: str = ""
     spec_json: Dict = Field(default_factory=dict)
-    status: Literal["idle", "ingested", "generating", "error"] = "idle"
+    status: Literal["idle", "ingested", "generated_code", "error"] = "idle"
     error: Optional[str] = None
+    generated_code: Optional[str] = ""
+    generated_test_code: Optional[str] = ""
     # msgs_exchanged: Optional[List[Message]] = None    # NOTE: Commenting it out for now, will see if it is needed later
-    # generated_code: str = ""                          # NOTE: This will also be looked afterwards

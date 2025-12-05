@@ -4,14 +4,14 @@ import json
 from langchain_core.runnables import RunnableConfig
 from rich.console import Console
 
-from rivet.core.inference import chat_completion
-from rivet.core.schema import AgentState, Message
+from rivet.core.inference import direct_chat_completion
+from rivet.core.schema import AgentState
 from rivet.tools.scrape import ingest_resource
 from rivet.utils.prompts import (
-    GENERATE_CODE_SYSTEM_PROMPT,
-    GENERATE_CODE_USER_PROMPT,
-    GENERATE_TEST_SYSTEM_PROMPT,
-    GENERATE_TEST_USER_PROMPT,
+    get_code_sys_prompt,
+    get_code_usr_prompt,
+    get_test_sys_prompt,
+    get_test_usr_prompt,
 )
 
 console = Console()
@@ -101,21 +101,18 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
 async def generate_code(state: AgentState, configuration: RunnableConfig):
     config = configuration.get("configurable", {})
     output_dir = config.get("output_dir", "./output")
+    has_error = state.error
 
-    sdk_sys_msg = Message(
-        role="system",
-        content=GENERATE_CODE_SYSTEM_PROMPT,
-    )
-    sdk_usr_msg = Message(
-        role="user",
-        content=GENERATE_CODE_USER_PROMPT.format(
-            SWAGGER_SPEC=json.dumps(state.spec_json),
-            DOCS_TEXT=state.doc_text,
-            USER_REQUIREMENTS=state.requirement or "",
+    generated_sdk_code = await direct_chat_completion(
+        config=config,
+        sys_msg_content=get_code_sys_prompt(),
+        usr_msg_content=get_code_usr_prompt(
+            swagger_spec=json.dumps(state.spec_json),
+            docs_text=state.doc_text,
+            user_requirements=state.requirement or None,
+            error=state.error or None,
         ),
     )
-    final_sdk_msgs = [sdk_sys_msg, sdk_usr_msg]
-    generated_sdk_code = await chat_completion(config, final_sdk_msgs)
     if generated_sdk_code is not None:
         with open(f"{output_dir}/client.py", "w") as f:
             f.write(generated_sdk_code)
@@ -123,27 +120,28 @@ async def generate_code(state: AgentState, configuration: RunnableConfig):
         # NOTE: Instead of raising the error here, we should try generating code again.
         raise ValueError("Failed to generate code.")
 
-    test_sys_msg = Message(
-        role="system",
-        content=GENERATE_TEST_SYSTEM_PROMPT,
-    )
-    test_usr_msg = Message(
-        role="user",
-        content=GENERATE_TEST_USER_PROMPT.format(
-            SWAGGER_SPEC=json.dumps(state.spec_json),
-            GENERATED_CODE=generated_sdk_code,
-            USER_REQUIREMENTS=state.requirement or "",
-        ),
-    )
-    final_test_msgs = [test_sys_msg, test_usr_msg]
-    generated_test_code = await chat_completion(config, final_test_msgs)
-    if generated_test_code is not None:
-        with open(f"{output_dir}/test_client.py", "w") as f:
-            f.write(generated_test_code)
-    else:
-        # NOTE: Same as above.
-        raise ValueError("Failed to generate code.")
+    if has_error is None:
+        generated_test_code = await direct_chat_completion(
+            config=config,
+            sys_msg_content=get_test_sys_prompt(),
+            usr_msg_content=get_test_usr_prompt(
+                swagger_spec=json.dumps(state.spec_json),
+                generated_code=generated_sdk_code,
+                user_requirements=state.requirement or None,
+            ),
+        )
+        if generated_test_code is not None:
+            with open(f"{output_dir}/test_client.py", "w") as f:
+                f.write(generated_test_code)
+        else:
+            # NOTE: Same as above.
+            raise ValueError("Failed to generate code.")
 
     return {
-        "status": "generating",
+        "status": "generated_code",
+        "generated_code": generated_sdk_code,
+        "generated_test_code": generated_test_code,
     }
+
+
+# async def test_code(state: AgentState, configuration: RunnableConfig):

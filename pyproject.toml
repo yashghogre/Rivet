@@ -16,6 +16,7 @@ dependencies = [
     "langsmith>=0.4.49",
     "openai>=2.9.0",
     "pydantic>=2.12.5",
+    "pytest>=9.0.1",
     "pyyaml>=6.0.3",
     "rich>=14.2.0",
     "typer>=0.20.0",

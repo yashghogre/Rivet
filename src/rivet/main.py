@@ -9,6 +9,7 @@ from rich.prompt import Prompt
 from rivet.cli.render import update_on_event
 from rivet.cli.ui import create_layout
 from rivet.core.agent import build_graph
+from rivet.core.schema import AgentState
 from rivet.tools.url_processor import check_url_validity
 from rivet.utils.config import get_llm_credentials
 
@@ -64,10 +65,10 @@ async def async_generate(url: str, requirement: str, output: str):
         },
     }
 
-    initial_state = {
-        "url": url,
-        "requirement": requirement,
-    }
+    initial_state = AgentState(
+        url=url,
+        requirement=requirement,
+    )
 
     with Live(layout, refresh_per_second=4, console=console):
         async for event in graph.astream(initial_state, config=run_config):

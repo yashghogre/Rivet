@@ -58,7 +58,7 @@ def update_on_event(layout: Layout, event: dict):
             error_log = data.get("error", "Unknown Error")
             layout["footer"].update(
                 Panel(
-                    f"[red]❌ Test Failed:[/red] {error_log[:100]}\n[green]🔧 Self-Healing Active...[/green]",
+                    f"[red]❌ Test Failed:[/red] {error_log}\n[green]🔧 Self-Healing Active...[/green]",
                     title="Self-Healing Active",
                     border_style="red",
                 )

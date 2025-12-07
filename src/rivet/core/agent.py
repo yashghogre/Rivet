@@ -39,6 +39,8 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
 async def generate_code(state: AgentState, config: RunnableConfig):
     config = config.get("configurable", {})
     output_dir = config.get("output_dir", "./output")
+    error = state.error
+    generated_test_code = state.test_code
 
     generated_sdk_code = await direct_chat_completion(
         config=config,
@@ -47,7 +49,7 @@ async def generate_code(state: AgentState, config: RunnableConfig):
             swagger_spec=json.dumps(state.spec_json),
             docs_text=state.doc_text,
             user_requirements=state.requirement or None,
-            error=state.error or None,
+            error=error or None,
         ),
     )
     if generated_sdk_code:
@@ -66,6 +68,7 @@ async def generate_code(state: AgentState, config: RunnableConfig):
             swagger_spec=json.dumps(state.spec_json),
             generated_code=generated_sdk_code,
             user_requirements=state.requirement or None,
+            error=error,
         ),
     )
     if generated_test_code:
@@ -85,8 +88,11 @@ async def generate_code(state: AgentState, config: RunnableConfig):
 async def test_code(state: AgentState, config: RunnableConfig):
     sdk_code = state.sdk_code
     test_code = state.test_code
+    output_dir = config.get("output_dir", "./output")
 
     passed, logs = await run_safe_test(sdk_code, test_code)
+    with open(f"{output_dir}/logs.txt", "w") as f:
+        f.write(logs)
 
     if passed:
         return {
@@ -119,6 +125,8 @@ def build_graph():
     workflow.add_edge("ingest_node", "generate_code")
     workflow.add_edge("generate_code", "test_code")
 
+    # TODO: Add a conditional node after "ingest_node", to check
+    # if the data has been ingested properly, otherwise END.
     workflow.add_conditional_edges(
         "test_code",
         route_after_test,

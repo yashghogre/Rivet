@@ -104,10 +104,48 @@ def get_test_sys_prompt():
     1. **The API Specification** (OpenAPI/Swagger) - to understand valid data examples.
     2. **The Generated SDK Code** - to know exactly which class names and method signatures to test.
     3. **User Requirements** - to know which specific parts to focus on (if any).
+    4. **Error** - to know what error the generated code in the last round threw.
+
+    **CRITICAL MOCKING RULES (DO NOT IGNORE)**
+    1. **NO `with Mock()`**: 
+       - NEVER write: `with Mock(...) as m:` (This causes TypeError).
+       - ALWAYS write: `mock = AsyncMock(...)` or `with patch(...) as m:`.
+    
+    2. **MOCKING ASYNC CONTEXT MANAGERS**:
+       - The SDK likely uses `async with httpx.AsyncClient() as client:`.
+       - To mock this, you MUST set the `__aenter__` return value.
+       - **REQUIRED PATTERN**:
+         ```python
+         # In your fixture:
+         mock_client_instance = AsyncMock(spec=httpx.AsyncClient)
+         mock_client_instance.__aenter__.return_value = mock_client_instance
+         
+         # If using patch:
+         with patch("httpx.AsyncClient", return_value=mock_client_instance):
+             yield mock_client_instance
+         ```
+    
+    3. **ASSERTING AUTH HEADERS**:
+       - If you initialize the client with `token="test_token"`, the SDK will generate a header like `Bearer test_token`.
+       - When asserting, do not expect `"Bearer mock_token"` unless you passed `"mock_token"` into the constructor.
+       - **Check the actual arguments** passed to the constructor in your test setup.
+
+    **TECHNICAL CONSTRAINTS**
+        - **Framework:** `pytest` and `pytest-asyncio` (if the SDK is async).
+        - **Mocking:** Use `unittest.mock` (standard library) or `pytest-mock`.
+        - **Imports:** Assume the SDK is in a file named `client.py`. Import as `from client import ...`.
+        - **Pydantic Compatibility:**
+           - Check the SDK code.
+           - If SDK uses `model_dump()`, your tests MUST use `model_dump()` (Pydantic V2).
+           - If SDK uses `dict()`, your tests MUST use `dict()` (Pydantic V1).
+
+    **CORE BEHAVIORS**
+        - **Coverage:** If `<user_requirements>` are provided, only test those features. Otherwise, cover all main endpoints.
+        - **Edge Cases:** Include at least one test case for an API error (e.g., mocking a 404 or 500 response to ensure the SDK raises the correct exception).
 
     **OUTPUT REQUIREMENTS**
     Generate a single Python file named `test_client.py` containing:
-    1. **Fixtures:** Pytest fixtures to initialize the SDK Client.
+    1. **Fixtures:** Pytest fixtures to initialize the SDK Client. Use `pytest_asyncio.fixture` for async setup.
     2. **Model Tests:** Unit tests verifying that the Pydantic models correctly validate data (valid data passes, invalid data raises `ValidationError`).
     3. **Client Tests:** Tests for the API methods.
         - **CRITICAL:** You must MOCK all network requests. Do not allow the tests to hit the real API.
@@ -115,22 +153,20 @@ def get_test_sys_prompt():
         - Verify that the SDK constructs the correct URLs and payloads based on the method arguments.
     4.  **Formatting:** Output raw Python code only. Do NOT wrap content in markdown code blocks (e.g., ```python).
 
-    **TECHNICAL CONSTRAINTS**
-        - **Framework:** `pytest` and `pytest-asyncio` (if the SDK is async).
-        - **Mocking:** Use `unittest.mock` (standard library) or `pytest-mock`.
-        - **Imports:** Assume the SDK is in a file named `client.py`. Import as `from client import ...`.
-
-    **CORE BEHAVIORS**
-        - **Coverage:** If `<user_requirements>` are provided, only test those features. Otherwise, cover all main endpoints.
-        - **Edge Cases:** Include at least one test case for an API error (e.g., mocking a 404 or 500 response to ensure the SDK raises the correct exception).
-
     **RESPONSE FORMAT**
-    Return only the Python code for the test file. Start with imports.
+    Return only the Python code for the test file.
+    Ensure you include: `from unittest.mock import AsyncMock, MagicMock, patch`
+    Start with imports.
     """)
 
 
-def get_test_usr_prompt(swagger_spec: str, generated_code: str, user_requirements: str):
-    return dedent(f"""
+def get_test_usr_prompt(
+    swagger_spec: str,
+    generated_code: str,
+    user_requirements: Optional[str] = None,
+    error: Optional[str] = None,
+):
+    prompt = dedent(f"""
     Please generate the `pytest` file for the following SDK.
 
     <api_specification>
@@ -140,16 +176,43 @@ def get_test_usr_prompt(swagger_spec: str, generated_code: str, user_requirement
     <generated_sdk_code>
     {generated_code}
     </generated_sdk_code>
+    """)
 
-    <user_requirements>
-    {user_requirements}
-    </user_requirements>
+    if user_requirements:
+        prompt += dedent(f"""
+        <user_requirements>
+        {user_requirements}
+        </user_requirements>
+        """)
 
+    if error:
+        prompt += dedent(f"""
+        <previous_test_failure>
+        The previous test suite FAILED. You must fix the code to resolve this specific error.
+        
+        ERROR LOG:
+        {error}
+        
+        CORRECTION STRATEGIES:
+        1. If `ModuleNotFoundError: No module named 'client'`:
+           - Ensure you use `from client import ...` (NOT `from src.client` or `from .client`).
+        
+        2. If `TypeError: 'Mock' object does not support context manager`:
+           - You used `with Mock():`. CHANGE IT to the `__aenter__` pattern defined in the system prompt.
+        
+        3. If `AssertionError` on headers:
+           - You are asserting headers that don't match the setup. Check your fixture initialization.
+           
+        4. If `AttributeError` on Pydantic models:
+           - Check if the SDK uses Pydantic V1 (`dict()`) or V2 (`model_dump()`). Match the SDK's usage.
+        </previous_test_failure>
+        """)
+
+    prompt += dedent("""
     Instructions:
     1. Analyze the `<generated_sdk_code>` to identify Class names, Method names, and Pydantic models.
     2. Refer to `<api_specification>` to generate realistic mock JSON data for the responses.
-    3. Check `<user_requirements>`:
-        - If present, only generate tests for the requested features.
-        - If absent, generate a comprehensive test suite.
-    4. Write the `test_client.py` file. Assume the SDK code is located in `client.py`.
+    3. Write the `test_client.py` file. Assume the SDK code is located in `client.py`.
     """)
+
+    return prompt

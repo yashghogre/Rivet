@@ -1,5 +1,6 @@
-from typing import Dict, List
+from typing import List
 
+from langchain_core.runnables import RunnableConfig
 from openai import AsyncOpenAI
 from rich.console import Console
 
@@ -8,10 +9,11 @@ from rivet.core.schema import Message
 console = Console()
 
 
-async def chat_completion(config: Dict, msgs: List[Message]) -> str:
-    llm_api_key = config.get("llm_api_key")
-    llm_base_url = config.get("llm_base_url")
-    llm_name = config.get("llm_name")
+async def chat_completion(config: RunnableConfig, msgs: List[Message]) -> str:
+    config_params = config.get("configurable", {})
+    llm_api_key = config_params.get("llm_api_key")
+    llm_base_url = config_params.get("llm_base_url")
+    llm_name = config_params.get("llm_name")
 
     if not llm_api_key or not llm_base_url or not llm_name:
         console.print(
@@ -36,7 +38,7 @@ async def chat_completion(config: Dict, msgs: List[Message]) -> str:
 
 
 async def direct_chat_completion(
-    config: Dict,
+    config: RunnableConfig,
     sys_msg_content: str,
     usr_msg_content: str,
 ) -> str:

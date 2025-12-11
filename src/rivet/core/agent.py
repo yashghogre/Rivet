@@ -8,6 +8,8 @@ from rivet.core.inference import direct_chat_completion
 from rivet.core.schema import AgentState
 from rivet.tools.sandbox import run_safe_test
 from rivet.tools.scrape import ingest_resource
+from rivet.tools.slicer import slice_spec
+from rivet.utils.code_cleaner import clean_code
 from rivet.utils.prompts import (
     get_code_sys_prompt,
     get_code_usr_prompt,
@@ -36,9 +38,25 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
         }
 
 
+async def slice_node(state: AgentState, config: RunnableConfig):
+    try:
+        sliced = slice_spec(state.spec_json, config, state.requirement)
+
+        if not sliced["paths"]:
+            return {"status": "error", "error": "No matching endpoints found."}
+
+        return {
+            "required_spec": sliced,
+            "status": "sliced",
+        }
+
+    except Exception as e:
+        return {"status": "error", "error": f"Slicing error: {str(e)}"}
+
+
 async def generate_code(state: AgentState, config: RunnableConfig):
-    config = config.get("configurable", {})
-    output_dir = config.get("output_dir", "./output")
+    config_params = config.get("configurable", {})
+    output_dir = config_params.get("output_dir", "./output")
     error = state.error
     generated_test_code = state.test_code
 
@@ -46,15 +64,17 @@ async def generate_code(state: AgentState, config: RunnableConfig):
         config=config,
         sys_msg_content=get_code_sys_prompt(),
         usr_msg_content=get_code_usr_prompt(
-            swagger_spec=json.dumps(state.spec_json),
+            swagger_spec=json.dumps(state.required_spec),
             docs_text=state.doc_text,
             user_requirements=state.requirement or None,
             error=error or None,
         ),
     )
+    cleaned_generated_sdk_code = clean_code(generated_sdk_code)
+
     if generated_sdk_code:
         with open(f"{output_dir}/client.py", "w") as f:
-            f.write(generated_sdk_code)
+            f.write(cleaned_generated_sdk_code)
     else:
         return {
             "status": "error",
@@ -65,22 +85,24 @@ async def generate_code(state: AgentState, config: RunnableConfig):
         config=config,
         sys_msg_content=get_test_sys_prompt(),
         usr_msg_content=get_test_usr_prompt(
-            swagger_spec=json.dumps(state.spec_json),
+            swagger_spec=json.dumps(state.required_spec),
             generated_code=generated_sdk_code,
             user_requirements=state.requirement or None,
             error=error,
         ),
     )
+    cleaned_generated_test_code = clean_code(generated_test_code)
+
     if generated_test_code:
         with open(f"{output_dir}/test_client.py", "w") as f:
-            f.write(generated_test_code)
+            f.write(cleaned_generated_test_code)
     else:
         return {"status": "error", "error": "LLM failed to generate test code."}
 
     return {
         "status": "generated_code",
-        "sdk_code": generated_sdk_code,
-        "test_code": generated_test_code,
+        "sdk_code": cleaned_generated_sdk_code,
+        "test_code": cleaned_generated_test_code,
         "error": None,
     }
 
@@ -117,12 +139,14 @@ def build_graph():
     workflow = StateGraph(AgentState)
 
     workflow.add_node("ingest_node", ingest_node)
+    workflow.add_node("slice_node", slice_node)
     workflow.add_node("generate_code", generate_code)
     workflow.add_node("test_code", test_code)
 
     workflow.set_entry_point("ingest_node")
 
-    workflow.add_edge("ingest_node", "generate_code")
+    workflow.add_edge("ingest_node", "slice_node")
+    workflow.add_edge("slice_node", "generate_code")
     workflow.add_edge("generate_code", "test_code")
 
     # TODO: Add a conditional node after "ingest_node", to check

@@ -13,7 +13,8 @@ class AgentState(BaseModel):
     requirement: Optional[str] = None
     doc_text: str = ""
     spec_json: Dict = Field(default_factory=dict)
-    status: Literal["idle", "ingested", "generated_code", "error", "success"] = "idle"
+    required_spec: Dict = Field(default_factory=dict)
+    status: Literal["idle", "ingested", "sliced", "generated_code", "error", "success"] = "idle"
     error: Optional[str] = None
     sdk_code: Optional[str] = ""
     test_code: Optional[str] = ""

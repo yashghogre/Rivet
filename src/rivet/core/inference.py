@@ -1,17 +1,19 @@
 from typing import Dict, List
 
-from openai import AsyncOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages.base import BaseMessage
+from langchain_core.runnables import RunnableConfig
+from langchain_openai import ChatOpenAI
 from rich.console import Console
-
-from rivet.core.schema import Message
 
 console = Console()
 
 
-async def chat_completion(config: Dict, msgs: List[Message]) -> str:
-    llm_api_key = config.get("llm_api_key")
-    llm_base_url = config.get("llm_base_url")
-    llm_name = config.get("llm_name")
+async def chat_completion(config: RunnableConfig, msgs: List[BaseMessage]) -> str:
+    configurable = config.get("configurable", {})
+    llm_api_key = configurable.get("llm_api_key")
+    llm_base_url = configurable.get("llm_base_url")
+    llm_name = configurable.get("llm_name")
 
     if not llm_api_key or not llm_base_url or not llm_name:
         console.print(
@@ -20,15 +22,13 @@ async def chat_completion(config: Dict, msgs: List[Message]) -> str:
         raise ValueError("LLM Configuration not set.")
 
     try:
-        client = AsyncOpenAI(
-            base_url=llm_base_url,
-            api_key=llm_api_key,
-        )
-        response = await client.chat.completions.create(
+        llm = ChatOpenAI(
             model=llm_name,
-            messages=[msg.model_dump() for msg in msgs],
+            openai_api_base=llm_base_url,
+            openai_api_key=llm_api_key,
         )
-        return response.choices[0].message.content
+        response = await llm.ainvoke(msgs, config=config)
+        return response.content
 
     except Exception as e:
         console.print(f"❌ Failed to create chat completion: {str(e)}")
@@ -41,15 +41,9 @@ async def direct_chat_completion(
     usr_msg_content: str,
 ) -> str:
     try:
-        sys_msg = Message(
-            role="system",
-            content=sys_msg_content,
-        )
-        usr_msg = Message(
-            role="user",
-            content=usr_msg_content,
-        )
-        final_msgs = [sys_msg, usr_msg]
+        final_msgs = []
+        final_msgs.append(SystemMessage(content=sys_msg_content))
+        final_msgs.append(HumanMessage(content=usr_msg_content))
         return await chat_completion(config, final_msgs)
 
     except Exception as e:

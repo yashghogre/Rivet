@@ -1,0 +1,99 @@
+services:
+  langfuse-server:
+    image: langfuse/langfuse:2.75.1
+    depends_on:
+      db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=langfuse
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://default:langfuse@clickhouse:9000
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=
+
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=mysecret
+      - SALT=mysalt
+      - ENCRYPTION_KEY=0b7b1de45115749108adf08a961ef9aa6137427ccf832e44cebbaa074970c9c4
+
+      - TELEMETRY_ENABLED=false
+      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=true
+
+  langfuse-worker:
+    image: langfuse/langfuse:2.75.1
+    depends_on:
+      - db
+      - clickhouse
+      - redis
+    command: "node dist/server/exec-worker.js"
+    environment:
+      # - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://default:langfuse@clickhouse:9000
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=langfuse
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=
+      - ENCRYPTION_KEY=0b7b1de45115749108adf08a961ef9aa6137427ccf832e44cebbaa074970c9c4
+
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    restart: always
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+        test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+    environment:
+        - CLICKHOUSE_DB=default
+        - CLICKHOUSE_USER=default
+        - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+        - CLICKHOUSE_PASSWORD=langfuse
+
+  redis:
+    image: redis:7
+    restart: always
+    healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+
+volumes:
+  postgres_data:
+  clickhouse_data:

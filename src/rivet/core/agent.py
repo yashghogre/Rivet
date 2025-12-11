@@ -37,8 +37,9 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
 
 
 async def generate_code(state: AgentState, config: RunnableConfig):
-    config = config.get("configurable", {})
-    output_dir = config.get("output_dir", "./output")
+    configurable_params = config.get("configurable", {})
+
+    output_dir = configurable_params.get("output_dir", "./output")
     error = state.error
     generated_test_code = state.test_code
 

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 
 import typer
@@ -12,9 +13,11 @@ from rivet.core.agent import build_graph
 from rivet.core.schema import AgentState
 from rivet.tools.url_processor import check_url_validity
 from rivet.utils.config import get_llm_credentials
+from rivet.utils.logging import setup_logging
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
+logger = logging.getLogger("rivet.main")
 
 
 @app.command()
@@ -24,7 +27,11 @@ def generate(
         None, "--req", "-r", help="Specific feature to generate (e.g: 'Payments')"
     ),
     output: str = typer.Option("./output", help="Save directory"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show debug logs in console"),
 ):
+    log_path = setup_logging(verbose)
+    logger.info(f"🚀 Rivet started. Logs: {log_path}")
+
     os.makedirs(output, exist_ok=True)
     asyncio.run(async_generate(url, requirement, output))
 
@@ -69,6 +76,8 @@ async def async_generate(url: str, requirement: str, output: str):
         url=url,
         requirement=requirement,
     )
+
+    logger.info(f"Starting the agent with state: {initial_state.model_dump_json(indent=2)}")
 
     with Live(layout, refresh_per_second=4, console=console):
         async for event in graph.astream(initial_state, config=run_config):

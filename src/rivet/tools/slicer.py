@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, Dict, List, Optional, Set
 
 from langchain_core.runnables import RunnableConfig
@@ -7,6 +8,7 @@ from rich.console import Console
 from rivet.core.inference import direct_chat_completion
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 def _extract_refs(obj: Any, refs: Set[str]):
@@ -67,6 +69,7 @@ def _resolve_dependencies(full_spec: Dict, target_paths: List[str]) -> Dict:
             mini_spec["components"][category][name] = curr
             _extract_refs(curr, ref_queue)
 
+    logger.info("✅ Spec sliced successfully!")
     console.print("[green]✅ Spec sliced successfully![/green]")
     return mini_spec
 
@@ -87,7 +90,7 @@ async def slice_spec(
     full_spec: Dict,
     config: RunnableConfig,
     requirement: Optional[str] = None,
-) -> Dict:
+) -> dict:
     if not requirement or requirement == "full_sdk":
         return full_spec
 
@@ -116,6 +119,7 @@ async def slice_spec(
             raise ValueError
 
     except Exception as e:
+        logger.error(f"⚠️ Slicing failed. Using full spec. Error: {str(e)}")
         console.print(f"[yellow]⚠️ Slicing failed. Using full spec. Error: {str(e)}[/yellow]")
         return full_spec
 

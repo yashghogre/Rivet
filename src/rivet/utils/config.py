@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import stat
 from pathlib import Path
@@ -11,9 +12,12 @@ SERVICE_NAME = "rivet-tool"
 USERNAME_LLM_API_KEY = "llm_api_key"
 USERNAME_LLM_BASE_URL = "llm_api_url"
 USERNAME_LLM_NAME = "llm_name"
-CREDENTIALS_FILE = Path.home() / ".config" / "rivet" / "credentials.json"
+CREDENTIALS_FILE = (
+    Path.home() / ".config" / "rivet" / "credentials.json"
+)  # TODO: Use platformdirs instead of manual path.
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 def _save_to_file_fallback(key: str, value: str):
@@ -36,7 +40,10 @@ def _save_to_file_fallback(key: str, value: str):
             json.dump(data, f, indent=2)
         os.chmod(CREDENTIALS_FILE, stat.S_IREAD | stat.S_IWRITE)
 
+        logger.info("✅ Saved the LLM config to fallback file successfully!")
+
     except Exception as e:
+        logger.error(f"❌ Could not save to fallback file: {e}")
         console.print(f"[red]❌ Could not save to fallback file: {e}[/red]")
 
 
@@ -48,6 +55,7 @@ def _load_from_file_fallback(entity: str) -> str | None:
             data = json.load(f)
             return data.get(entity)
     except Exception:
+        logger.error("❌ Failed to load the LLM config from fallback file.")
         return None
 
 

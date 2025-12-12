@@ -20,13 +20,18 @@ The previous code generation failed to execute. You are now in FIX MODE.
     return dedent(f"""
     {base_prompt}
     {fix_instruction}
+
+    ### STRICT OUTPUT FORMATTING
+    1. **NO MARKDOWN**: Do not use ```python or ``` blocks.
+    2. **NO CONVERSATION**: Do not write "Here is the code" or "I have fixed the error".
+    3. **PURE CODE**: The very first character of your response must be an import statement (e.g., `import` or `from`).
+
     ### OUTPUT REQUIREMENTS
     You must generate a single, self-contained Python file (or a clear sequence of code blocks) containing:
     1.  **Configuration:** A base `Client` class handling authentication, base URL, and session management.
     2.  **Data Models:** Pydantic `BaseModel` classes for schemas.
     3.  **Methods:** API endpoint methods with snake_case naming and full docstrings.
     4.  **Error Handling:** Custom exception classes.
-    5.  **Formatting:** Output raw Python code only. Do NOT wrap content in markdown code blocks (e.g., ```python). Do NOT include conversational text.
 
     ### SCOPE & FILTERING
     - **Critical:** Pay close attention to the `<user_requirements>` section in the prompt.
@@ -143,6 +148,11 @@ def get_test_sys_prompt():
         - **Coverage:** If `<user_requirements>` are provided, only test those features. Otherwise, cover all main endpoints.
         - **Edge Cases:** Include at least one test case for an API error (e.g., mocking a 404 or 500 response to ensure the SDK raises the correct exception).
 
+    **STRICT OUTPUT FORMATTING**
+    1. **NO MARKDOWN**: Do not use ```python or ``` blocks.
+    2. **NO CONVERSATION**: Do not write "Here is the code" or "I have fixed the error".
+    3. **PURE CODE**: The very first character of your response must be an import statement (e.g., `import` or `from`).
+
     **OUTPUT REQUIREMENTS**
     Generate a single Python file named `test_client.py` containing:
     1. **Fixtures:** Pytest fixtures to initialize the SDK Client. Use `pytest_asyncio.fixture` for async setup.
@@ -151,7 +161,6 @@ def get_test_sys_prompt():
         - **CRITICAL:** You must MOCK all network requests. Do not allow the tests to hit the real API.
         - Use `unittest.mock` or `pytest-mock` to patch the underlying HTTP client (e.g., `httpx.AsyncClient.request` or `requests.Session.request`) or the SDK methods themselves.
         - Verify that the SDK constructs the correct URLs and payloads based on the method arguments.
-    4.  **Formatting:** Output raw Python code only. Do NOT wrap content in markdown code blocks (e.g., ```python).
 
     **RESPONSE FORMAT**
     Return only the Python code for the test file.

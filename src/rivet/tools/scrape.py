@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Dict, Tuple
 
 import httpx
@@ -7,6 +8,7 @@ from bs4 import BeautifulSoup
 from rich.console import Console
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 async def fetch_spec(url: str) -> Dict:
@@ -21,19 +23,28 @@ async def fetch_spec(url: str) -> Dict:
                 try:
                     data = yaml.safe_load(response.text)
                 except yaml.YAMLError:
+                    logger.error(
+                        "❌ Error while fetching spec: URL content is not valid JSON or YAML."
+                    )
                     raise ValueError("URL content is not valid JSON or YAML.")
 
             if not ("openapi" in data or "swagger" in data):
+                logger.error(
+                    "❌ Error while fetching spec: JSON found, but it's not an OpenAPI spec (missing 'openapi' or 'swagger' key)."
+                )
                 raise ValueError(
                     "JSON found, but it's not an OpenAPI spec (missing 'openapi' or 'swagger' key)."
                 )
 
+            logger.info("✅ Fetched the swagger spec successfully!")
             console.print("[green]✅ Fetched the swagger spec successfully![/green]")
             return data
 
         except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch Spec: HTTP {e.response.status_code}")
             raise ValueError(f"Failed to fetch Spec: HTTP {e.response.status_code}")
         except Exception as e:
+            logger.error(f"Ingestion Error: {str(e)}")
             raise ValueError(f"Ingestion Error: {str(e)}")
 
 
@@ -52,13 +63,15 @@ async def fetch_docs_text(url: str) -> str:
 
             clean_text = "\n".join([line.strip() for line in text.splitlines() if line.strip()])
 
+            logger.info("✅ Fetched the docs via spec successfully!")
             console.print("[green]✅ Fetched the docs successfully![/green]")
 
             # NOTE: Only taking the first 20k characters. Will optimize this part later
             # Also, this is not the priority, docs are secondary for now.
             return clean_text[:20000]
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ Error while fetching docs text: {str(e)}")
             return ""
 
 

@@ -1,4 +1,5 @@
 import json
+import logging
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, StateGraph
@@ -18,6 +19,7 @@ from rivet.utils.prompts import (
 )
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 async def ingest_node(state: AgentState, config: RunnableConfig):
@@ -25,6 +27,7 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
 
     try:
         spec_json, docs_text = await ingest_resource(url)
+        logger.info("✅ Spec ingested successfully!")
         return {
             "spec_json": spec_json,
             "docs_text": docs_text,
@@ -32,6 +35,7 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
         }
 
     except ValueError as e:
+        logger.error(f"❌ Error while ingesting spec: {str(e)}")
         return {
             "status": "error",
             "error": str(e),
@@ -40,17 +44,19 @@ async def ingest_node(state: AgentState, config: RunnableConfig):
 
 async def slice_node(state: AgentState, config: RunnableConfig):
     try:
-        sliced = slice_spec(state.spec_json, config, state.requirement)
+        sliced = await slice_spec(state.spec_json, config, state.requirement)
 
         if not sliced["paths"]:
             return {"status": "error", "error": "No matching endpoints found."}
 
+        logger.info("✅ Spec sliced successfully.")
         return {
             "required_spec": sliced,
             "status": "sliced",
         }
 
     except Exception as e:
+        logger.error(f"❌ Error while slicing spec: {str(e)}")
         return {"status": "error", "error": f"Slicing error: {str(e)}"}
 
 
@@ -99,6 +105,7 @@ async def generate_code(state: AgentState, config: RunnableConfig):
     else:
         return {"status": "error", "error": "LLM failed to generate test code."}
 
+    logger.info("✅ SDK and test code generated successfully!")
     return {
         "status": "generated_code",
         "sdk_code": cleaned_generated_sdk_code,
@@ -117,11 +124,13 @@ async def test_code(state: AgentState, config: RunnableConfig):
         f.write(logs)
 
     if passed:
+        logger.info("✅ Code tests passed!")
         return {
             "status": "success",
             "error": None,
         }
     else:
+        logger.info("❌ Code tests failed!")
         return {
             "status": "error",
             "error": logs,

@@ -12,7 +12,7 @@ from rivet.cli.ui import create_layout
 from rivet.core.agent import build_graph
 from rivet.core.schema import AgentState
 from rivet.tools.url_processor import check_url_validity
-from rivet.utils.config import get_llm_credentials
+from rivet.utils.config import CREDENTIALS_FILE, get_llm_credentials
 from rivet.utils.logging import setup_logging
 
 app = typer.Typer(no_args_is_help=True)
@@ -38,6 +38,9 @@ def generate(
 
 async def async_generate(url: str, requirement: str, output: str):
     llm_base_url, llm_api_key, llm_name = get_llm_credentials()
+    console.print(
+        f"[dim]💡 LLM configuration stored at {CREDENTIALS_FILE}. Check that file to change the configurations.[/dim]"
+    )
 
     if not url:
         console.print("Welcome to Rivet!", style="bold blue")

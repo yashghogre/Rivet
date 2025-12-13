@@ -5,6 +5,7 @@ import stat
 from pathlib import Path
 from typing import Tuple
 
+import platformdirs
 from rich.console import Console
 from rich.prompt import Prompt
 
@@ -12,9 +13,7 @@ SERVICE_NAME = "rivet-tool"
 USERNAME_LLM_API_KEY = "llm_api_key"
 USERNAME_LLM_BASE_URL = "llm_api_url"
 USERNAME_LLM_NAME = "llm_name"
-CREDENTIALS_FILE = (
-    Path.home() / ".config" / "rivet" / "credentials.json"
-)  # TODO: Use platformdirs instead of manual path.
+CREDENTIALS_FILE = Path(platformdirs.user_config_dir("rivet")) / "credentials.json"
 
 console = Console()
 logger = logging.getLogger(__name__)

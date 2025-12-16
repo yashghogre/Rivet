@@ -42,34 +42,62 @@ Puff operates in a three-stage pipeline to ensure quality and correctness.
 
 ```mermaid
 graph TD
-    subgraph Stage1["Stage 1: The Architect (Analysis)"]
-        User[User Input] -->|URL + 'I need payments'| Slicer[Spec Slicer Node]
-        DocSource[OpenAPI URL] -->|Fetch JSON| Slicer
-        Slicer -->|Graph Traversal| MiniSpec[Mini-Spec JSON]
-        Docs[HTML Docs] -->|Scrape| RAG[Graph State]
-    end
+    %% Node Definitions
+    Ingest[("Ingest Node<br/>(Fetch Spec & Docs)")]
+    Slice[("Slice Node<br/>(Filter Spec)")]
+    GenSDK[("Generate SDK<br/>(LLM: Create client.py)")]
+    ValSDK[("Validate SDK<br/>(Syntax & Import Check)")]
+    GenTests[("Generate Tests<br/>(LLM: Create test_client.py)")]
+    RunTests[("Run Tests<br/>(Pytest execution)")]
+    
+    FixSDK[("Fix SDK Targeted<br/>(LLM: Surgical Fix)")]
+    FixTests[("Fix Tests Targeted<br/>(LLM: Adjust Tests)")]
+    
+    %% End Node
+    End((End/Success))
+    Fail((End/Fail))
 
-    subgraph Stage2["Stage 2: The Builder (Generation)"]
-        MiniSpec -->|Context| Agent[LangGraph Coding Agent]
-        RAG -->|Context| Agent
-        Agent -->|Generate| ClientCode["client.py"]
-        Agent -->|Generate| TestCode["test_integration.py"]
-    end
+    %% Styles with Darker Backgrounds and Lighter Text
+    style Ingest fill:#023e58,stroke:#01579b,stroke-width:2px,color:#ffffff
+    style Slice fill:#023e58,stroke:#01579b,stroke-width:2px,color:#ffffff
+    style GenSDK fill:#1b5e20,stroke:#2e7d32,stroke-width:2px,color:#ffffff
+    style ValSDK fill:#f57f17,stroke:#fbc02d,stroke-width:2px,color:#ffffff
+    style GenTests fill:#1b5e20,stroke:#2e7d32,stroke-width:2px,color:#ffffff
+    style RunTests fill:#f57f17,stroke:#fbc02d,stroke-width:2px,color:#ffffff
+    style FixSDK fill:#bf360c,stroke:#d84315,stroke-width:2px,stroke-dasharray: 5 5,color:#ffffff
+    style FixTests fill:#bf360c,stroke:#d84315,stroke-width:2px,stroke-dasharray: 5 5,color:#ffffff
+    style End fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#ffffff
+    style Fail fill:#c62828,stroke:#b71c1c,stroke-width:2px,color:#ffffff
 
-    subgraph Stage3["Stage 3: The Auditor (Verification)"]
-        ClientCode -->|Inject| Docker[Docker Container]
-        TestCode   -->|Inject| Docker
-        Docker -->|Run Pytest| Result{Pass or Fail?}
-        
-        Result -->|Fail with Stderr| ErrorParser[Error Analyzer]
-        ErrorParser -->|Feedback + Logs| Agent
-        
-        Result -->|Pass| Package[Final SDK Package]
-    end
+    %% Main Flow
+    Ingest --> Slice
+    Slice --> GenSDK
+    GenSDK --> ValSDK
 
-    style Agent fill:#800,stroke:#333,stroke-width:2px
-    style Docker fill:#003f5c,stroke:#fff,stroke-width:2px,color:#fff
-    style ErrorParser fill:#bc5090,stroke:#333,stroke-width:2px,color:#fff
+    %% Validation Routing (route_after_sdk_validation)
+    ValSDK -- "Status: sdk_valid" --> GenTests
+    ValSDK -- "Status: sdk_invalid (Retry < 3)" --> FixSDK
+    ValSDK -- "Status: sdk_invalid (Retry >= 3)" --> Fail
+
+    %% SDK Fix Loop (Validation Cycle)
+    FixSDK --> ValSDK
+
+    %% Test Flow
+    GenTests --> RunTests
+
+    %% Test Routing (route_after_test)
+    RunTests -- "Status: success" --> End
+    RunTests -- "Status: test_failed" --> Analyze{Error Analysis}
+    
+    %% Error Analysis Routing
+    Analyze -- "Is SDK Error? (Retry < 3)" --> FixSDK
+    Analyze -- "Is SDK Error? (Retry >= 3)" --> Fail
+    Analyze -- "Is Test Error? (Retry < 3)" --> FixTests
+    Analyze -- "Is Test Error? (Retry >= 3)" --> Fail
+
+    %% Test Fix Loop (Execution Cycle)
+    %% Note: Test fixes go straight back to execution, skipping SDK validation
+    FixTests --> RunTests
 ```
 
 

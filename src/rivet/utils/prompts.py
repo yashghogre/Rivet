@@ -165,6 +165,7 @@ def get_test_sys_prompt():
     **RESPONSE FORMAT**
     Return only the Python code for the test file.
     Ensure you include: `from unittest.mock import AsyncMock, MagicMock, patch`
+    **CRITICAL:** Ensure you import `pytest`, `pytest_asyncio`, `httpx`, and all SDK classes.
     Start with imports.
     """)
 
@@ -225,3 +226,124 @@ def get_test_usr_prompt(
     """)
 
     return prompt
+
+
+def get_fix_sdk_usr_prompt(
+    current_sdk: str,
+    error_logs: str,
+    error_category: str,
+    error_suggestion: str,
+    error_message: str,
+    file_path: Optional[str] = None,
+    line_number: Optional[int] = None,
+) -> str:
+    # Use the last 2000 chars of logs to capture the actual traceback
+    relevant_logs = error_logs[-2000:] if error_logs else "No logs available"
+
+    location_info = f"Line {line_number}" if line_number else "Unknown Line"
+    if file_path:
+        location_info += f" in {file_path}"
+
+    return dedent(f"""
+    The SDK code has a specific error that needs fixing.
+
+    ### 1. DIAGNOSIS
+    - **Error Category:** {error_category}
+    - **Issue:** {error_suggestion}
+    - **Specific Error:** {error_message}
+    - **Location:** {location_info}
+
+    ### 2. CURRENT SDK CODE
+    ```python
+    {current_sdk}
+    ```
+
+    ### 3. RELEVANT LOGS (Traceback)
+    ```text
+    {relevant_logs}
+    ```
+
+    ### 4. FIX INSTRUCTIONS
+    1. **Identify the missing dependency or logic flaw.**
+       - If `NameError: name 'json' is not defined`, add `import json`.
+       - If `AttributeError: 'Client' has no attribute 'session'`, add `self.session` initialization.
+    2. **Apply the fix surgically.** Do not change logic that isn't broken.
+    3. **Verify Imports:** Scan the code to ensure all used types (`List`, `Optional`, `Dict`, `Any`) and libraries (`httpx`, `pydantic`) are imported.
+
+    ### 5. OUTPUT
+    Return the **COMPLETE** fixed `client.py` file.
+    """).strip()
+
+
+def get_fix_test_sys_prompt():
+    return """### ROLE
+You are a Senior Python QA Automation Architect specializing in `pytest`, `httpx`, and `asyncio`. 
+Your goal is to fix a broken test suite to make it pass against a **verified correct** SDK.
+
+### CRITICAL RULES
+1. **SDK IS IMMUTABLE:** Do not modify, assume, or suggest changes to the SDK code. If the Test expects `X` but SDK returns `Y`, change the Test to expect `Y`.
+2. **FULL REWRITE:** You must return the **ENTIRE** content of the fixed test file. Do not return snippets or diffs.
+3. **IMPORT SAFETY:** You must explicitly ensure `pytest`, `pytest_asyncio`, `httpx`, and all SDK classes are imported.
+4. **NO MARKDOWN:** Return ONLY the raw Python code. No conversational filler.
+"""
+
+
+def get_fix_test_usr_prompt(
+    current_tests: str,
+    sdk_code: str,
+    error_logs: str,
+    error_category: str,
+    error_suggestion: str,
+    error_message: str,
+) -> str:
+    # Use the last 2000 chars to catch the pytest failure summary
+    relevant_logs = error_logs[-2000:] if error_logs else "No logs available"
+
+    return dedent(f"""
+    We have a test failure. You need to fix `test_client.py` so it passes with the provided `client.py`.
+
+    ### 1. CONTEXT
+    - **Error Category:** {error_category}
+    - **Issue:** {error_suggestion}
+    - **Message:** {error_message}
+
+    ### 2. THE IMMUTABLE SDK (Source of Truth)
+    ```python
+    {sdk_code}
+    ```
+
+    ### 3. THE BROKEN TEST FILE
+    ```python
+    {current_tests}
+    ```
+
+    ### 4. THE ERROR LOGS
+    ```text
+    {relevant_logs}
+    ```
+
+    ### 5. TASK & STRATEGY
+    1. **Analyze the Traceback:** Look at the line number in the logs to find the failure.
+    2. **Check Mocks (CRITICAL):** - If the error is `TypeError: 'coroutine' object is not iterable`, your mock returned a Coroutine instead of a List/Dict.
+       - **Fix:** Ensure you set `.return_value` correctly for async methods. 
+       - Example: `mock_client.get.return_value = MagicMock(status_code=200, json=lambda: [...])`
+    3. **Check Imports:** Ensure `pytest_asyncio` and `httpx` are imported if used.
+    4. **Align Expectations:** If the SDK returns a Pydantic model, ensure the test asserts against model attributes, not dictionary keys.
+
+    ### 6. OUTPUT
+    Return the **COMPLETE** fixed `test_client.py` file.
+    """).strip()
+
+
+def get_fix_sdk_sys_prompt() -> str:
+    return dedent("""
+    ### ROLE
+    You are a Senior Python API Developer. You are fixing a specific bug in an existing SDK.
+
+    ### CRITICAL RULES
+    1. **SURGICAL FIX:** Only fix the specific error described. Do not refactor working code.
+    2. **PRESERVE INTERFACE:** Do not change method signatures or class names unless they are the direct cause of the error.
+    3. **FULL REWRITE:** Return the **ENTIRE** corrected `client.py` file. Do not return snippets or diffs.
+    4. **DEPENDENCY CHECK:** If the error is `NameError` or `ImportError`, ensure the missing library is added to the top of the file.
+    5. **NO MARKDOWN:** Return ONLY the raw Python code. Start with imports.
+    """).strip()

@@ -90,10 +90,10 @@ graph TD
     RunTests -- "Status: test_failed" --> Analyze{Error Analysis}
     
     %% Error Analysis Routing
-    Analyze -- "Is SDK Error? (Retry < 3)" --> FixSDK
-    Analyze -- "Is SDK Error? (Retry >= 3)" --> Fail
-    Analyze -- "Is Test Error? (Retry < 3)" --> FixTests
-    Analyze -- "Is Test Error? (Retry >= 3)" --> Fail
+    Analyze -- "Is SDK Error? (Retry < 5)" --> FixSDK
+    Analyze -- "Is SDK Error? (Retry >= 5)" --> Fail
+    Analyze -- "Is Test Error? (Retry < 5)" --> FixTests
+    Analyze -- "Is Test Error? (Retry >= 5)" --> Fail
 
     %% Test Fix Loop (Execution Cycle)
     %% Note: Test fixes go straight back to execution, skipping SDK validation
@@ -123,22 +123,45 @@ This is where the magic happens.
 
 ### 🛠️ Installation
 
+You can install Rivet directly from PyPI or build it from source.
+
+**Option 1: Standard Installation (Recommended)**
+
+```bash
+pip install rivet-ai
 ```
-# Clone the repository
+
+**Option 2: Development Installation If you want to contribute or modify the source code:**
+
+```bash
 git clone https://github.com/yashghogre/Rivet.git
 
-# Install dependencies (We use uv!)
+cd Rivet
+
 uv sync
 ```
-
 
 ### 💻 Usage
 
 #### 1. Run the Generator
 
-You can generate a full SDK or scope it to specific requirements.
+Point Rivet at any OpenAPI/Swagger URL to generate a client.
 
+If installed via pip:
+
+```bash
+rivet https://petstore.swagger.io/v2/swagger.json
 ```
+
+or simply,
+
+```bash
+rivet
+```
+
+If running from source:
+
+```bash
 uv run rivet https://petstore.swagger.io/v2/swagger.json
 ```
 

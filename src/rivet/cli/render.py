@@ -1,10 +1,17 @@
+import logging
+
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.syntax import Syntax
 
+logger = logging.getLogger(__name__)
+
 
 def update_on_event(layout: Layout, event: dict):
+    logger.info(f"TUI Event received: {list(event.keys())}")
+    logger.info(f"Full Event data: {event}")
+
     if "ingest_node" in event:
         data = event["ingest_node"]
         url = data.get("url", "url")
@@ -26,36 +33,80 @@ def update_on_event(layout: Layout, event: dict):
                 )
             )
 
+    elif "slice_node" in event:
+        layout["body"].update(
+            Panel(
+                Spinner(
+                    "dots",
+                    text="🔪 Spec sliced successfully.\n\n🧠 Generating SDK code (Calling LLM)...",
+                ),
+                title="Step 2: Code Generation",
+                border_style="yellow",
+            )
+        )
+        layout["footer"].update(
+            Panel("✅ Slice complete. Starting LLM Generation...", style="green")
+        )
+
     elif "generate_sdk" in event:
+        logger.info("Processing generate_sdk event")
         data = event["generate_sdk"]
+
+        logger.info(f"generate_sdk data: {data}")
+
+        # Show retry count if applicable
+        retry_count = data.get("sdk_retry_count", 0)
+        retry_msg = f" (Retry {retry_count}/3)" if retry_count > 0 else ""
+
         if "error" in data and data["error"]:
             layout["footer"].update(
-                Panel(f"[red]❌ Code Generation Failed.[/red]{data['error']}", style="bold red")
+                Panel(
+                    f"[red]❌ SDK Generation Failed{retry_msg}:[/red] {data['error']}",
+                    style="bold red",
+                )
             )
         else:
             code = data.get("sdk_code", "# Generating...")
             syntax = Syntax(code[:1000] + "\n...", "python", theme="monokai", line_numbers=True)
             layout["body"].update(
-                Panel(syntax, title="Generated SDK Code (Snippet)", border_style="green")
+                Panel(
+                    syntax, title=f"Generated SDK Code{retry_msg} (Snippet)", border_style="green"
+                )
             )
             layout["footer"].update(
                 Panel(
-                    Spinner("runner", text="🧪 Moving to SDK Validation..."),
-                    title="Verification",
+                    Spinner("runner", text="🔍 Validating SDK syntax..."),
+                    title="Step 3: Validation",
+                    style="cyan",
                 )
             )
+            logger.info(f"Updated layout['body']. Layout ID: {id(layout)}")
 
     elif "validate_sdk" in event:
         data = event["validate_sdk"]
+        retry_count = data.get("sdk_retry_count", 0)
+        retry_msg = f" (Retry {retry_count}/3)" if retry_count > 0 else ""
+
         if "error" in data and data["error"]:
             layout["footer"].update(
                 Panel(f"[red]❌ SDK Validation Failed.[/red]{data['error']}", style="bold red")
             )
         else:
-            layout["body"].update(Panel(Spinner("dots", text="✅ SDK Validated Successfully!")))
+            code = data.get("sdk_code", "# Generating...")
+            syntax = Syntax(code[:1000] + "\n...", "python", theme="monokai", line_numbers=True)
+            # layout["body"].update(
+            #     Panel(
+            #         syntax,
+            #         title=f"Generated SDK Code{retry_msg} (Snippet)",
+            #         border_style="green"
+            #     )
+            # )
             layout["footer"].update(
                 Panel(
-                    Spinner("runner", text="⚒️ Moving to Tests Generation..."),
+                    Spinner(
+                        "runner",
+                        text="✅ SDK Validated Successfully!\n⚒️ Moving to Tests Generation...",
+                    ),
                     title="Generation",
                 )
             )

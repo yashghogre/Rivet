@@ -27,6 +27,11 @@ from rivet.utils.prompts import (
 console = Console()
 logger = logging.getLogger(__name__)
 
+# This belongs in RunnableConfig.configurable,
+# But we will make do with this for now.
+MAX_SDK_RETRIES = 5
+MAX_TEST_RETRIES = 5
+
 
 async def ingest_node(state: AgentState, config: RunnableConfig):
     url = state.url
@@ -420,13 +425,12 @@ def route_after_sdk_validation(state: AgentState) -> str:
         return "generate_tests"
 
     sdk_retry_count = state.sdk_retry_count
-    max_sdk_retries = 3
 
-    if sdk_retry_count >= max_sdk_retries:
-        logger.error(f"❌ Max SDK retry limit reached ({max_sdk_retries})")
+    if sdk_retry_count >= MAX_SDK_RETRIES:
+        logger.error(f"❌ Max SDK retry limit reached ({MAX_SDK_RETRIES})")
         return "end"
 
-    logger.info(f"🔄 Retrying SDK fix ({sdk_retry_count + 1}/{max_sdk_retries})")
+    logger.info(f"🔄 Retrying SDK fix ({sdk_retry_count + 1}/{MAX_SDK_RETRIES})")
     return "fix_sdk"
 
 
@@ -442,22 +446,20 @@ def route_after_test(state: AgentState) -> str:
 
     sdk_retry_count = state.sdk_retry_count
     test_retry_count = state.test_retry_count
-    max_sdk_retries = 3
-    max_test_retries = 3
 
     if analysis.get("is_sdk_error"):
-        if sdk_retry_count >= max_sdk_retries:
-            logger.error(f"❌ Max SDK retry limit reached ({max_sdk_retries})")
+        if sdk_retry_count >= MAX_SDK_RETRIES:
+            logger.error(f"❌ Max SDK retry limit reached ({MAX_SDK_RETRIES})")
             return "end"
 
-        logger.info(f"🔄 Routing to SDK fix ({sdk_retry_count + 1}/{max_sdk_retries})")
+        logger.info(f"🔄 Routing to SDK fix ({sdk_retry_count + 1}/{MAX_SDK_RETRIES})")
         return "fix_sdk"
     else:
-        if test_retry_count >= max_test_retries:
-            logger.error(f"❌ Max test retry limit reached ({max_test_retries})")
+        if test_retry_count >= MAX_TEST_RETRIES:
+            logger.error(f"❌ Max test retry limit reached ({MAX_TEST_RETRIES})")
             return "end"
 
-        logger.info(f"🔄 Routing to test fix ({test_retry_count + 1}/{max_test_retries})")
+        logger.info(f"🔄 Routing to test fix ({test_retry_count + 1}/{MAX_TEST_RETRIES})")
         return "fix_tests"
 
 
